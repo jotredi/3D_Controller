@@ -8,6 +8,8 @@
 #include "BaseController.h"
 #include "Math/Mat3x3F.h"
 
+#include <iostream>
+
 #ifdef __PX4_NUTTX
 #include <systemlib/param/param.h>
 #endif
@@ -115,7 +117,14 @@ V3F QuadControl::BodyRateControl(V3F pqrCmd, V3F pqr)
 
   ////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 
+  // Calculate error
+  V3F rate_error = pqrCmd - pqr;
 
+  // Moments of inertia
+  V3F I = V3F (Ixx, Iyy, Izz);
+
+  // Desired moments
+  momentCmd = I * kpPQR * rate_error;
 
   /////////////////////////////// END STUDENT CODE ////////////////////////////
 
@@ -146,7 +155,44 @@ V3F QuadControl::RollPitchControl(V3F accelCmd, Quaternion<float> attitude, floa
 
   ////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 
+  // Convert collThrustCmd to acceleration
+  float c_d = -(collThrustCmd / mass);
 
+  if (collThrustCmd){
+    // Set commanded b_x & b_y
+    float b_x_c = accelCmd.x / c_d;
+    float b_y_c = accelCmd.y / c_d;
+
+    // Actual matrix elements
+    float b_x_a = R(0,2);
+    float b_y_a = R(1,2);
+
+    // Desired rate of change of matrix elements
+    float b_x_c_dot = kpBank * (b_x_c - b_x_a);
+    float b_y_c_dot = kpBank * (b_y_c - b_y_a);
+
+    // Get matrix elements
+    float R11 = R(0,0);
+    float R12 = R(0,1);
+    float R21 = R(1,0);
+    float R22 = R(1,1);
+    float R33 = R(2,2);
+
+    // Desired pitch & roll rates
+    float p_c = (R21*b_x_c_dot - R11*b_y_c_dot) / R33;
+    float q_c = (R22*b_x_c_dot - R12*b_y_c_dot) / R33;
+    float r_c = 0.f;
+
+    pqrCmd.x = p_c;
+    pqrCmd.y = q_c;
+    pqrCmd.z = r_c;
+  }
+  else{
+    // No rate
+    pqrCmd.x = 0.f;
+    pqrCmd.y = 0.f;
+    pqrCmd.z = 0.f;
+  }
 
   /////////////////////////////// END STUDENT CODE ////////////////////////////
 
@@ -178,7 +224,24 @@ float QuadControl::AltitudeControl(float posZCmd, float velZCmd, float posZ, flo
 
   ////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 
+  // Commanded vertical velocity
+  float z_err = posZCmd - posZ;
+  float z_dot_c = kpPosZ * z_err + velZCmd;
 
+  // Constrain vertical velocity
+  z_dot_c = CONSTRAIN(z_dot_c, -maxAscentRate, maxDescentRate);
+
+  // Accumulate integral error
+  integratedAltitudeError += z_err * dt;
+
+  // Commanded vertical acceleration
+  float u_1 = kpVelZ * (z_dot_c - velZ) + KiPosZ * integratedAltitudeError + accelZCmd;
+
+  // Calculate thrust (N)
+  thrust = mass * (9.81f - u_1) / R(2,2);
+
+  // Constrain thrust
+  thrust = CONSTRAIN(thrust, 4*minMotorThrust, 4*maxMotorThrust);
 
   /////////////////////////////// END STUDENT CODE ////////////////////////////
 
@@ -216,7 +279,19 @@ V3F QuadControl::LateralPositionControl(V3F posCmd, V3F velCmd, V3F pos, V3F vel
 
   ////////////////////////////// BEGIN STUDENT CODE ///////////////////////////
 
+  // Desired velocity
+  V3F vel_c = kpPosXY * (posCmd - pos) + velCmd;
 
+  // Constrain velocity
+  vel_c.x = CONSTRAIN(vel_c.x, -maxSpeedXY, maxSpeedXY);
+  vel_c.y = CONSTRAIN(vel_c.y, -maxSpeedXY, maxSpeedXY);
+
+  // Desired acceleration
+  accelCmd += kpVelXY * (vel_c - vel);
+
+  // Constrain acceleration
+  accelCmd.x = CONSTRAIN(accelCmd.x, -maxAccelXY, maxAccelXY);
+  accelCmd.y = CONSTRAIN(accelCmd.y, -maxAccelXY, maxAccelXY);
 
   /////////////////////////////// END STUDENT CODE ////////////////////////////
 
