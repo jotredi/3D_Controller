@@ -26,17 +26,16 @@ with open('FigureEight.txt', 'w') as the_file:
 		vy = 0;
 		vz = 0;
 		######## BEGIN STUDENT CODE
-		
+
 		######## END STUDENT CODE
-		the_file.write("," + fmt(vx) + "," + fmt(vy) + "," + fmt(vz));
+		#the_file.write("," + fmt(vx) + "," + fmt(vy) + "," + fmt(vz));
 		######## EXAMPLE SOLUTION
-        #the_file.write("," + fmt((x-px)/timestep) + "," + fmt((y-py)/timestep) + "," + fmt((z-pz)/timestep));
-		#px = x;
-        #py = y;
-        #pz = z;
+        the_file.write("," + fmt((x-px)/timestep) + "," + fmt((y-py)/timestep) + "," + fmt((z-pz)/timestep));
+		px = x;
+        py = y;
+        pz = z;
 		######## END EXAMPLE SOLUTION
-		
+
         the_file.write("\n");
-        
+
         t += timestep;
-            
